@@ -119,10 +119,45 @@ plt.xlabel('Psychographic Cluster ID', fontsize=12)
 plt.ylabel('Feature', fontsize=12)
 plt.tight_layout()
 
-print("Saving heatmap to 'thesis_final_grey.png'...")
-plt.savefig('thesis_final_grey.png')
+# print("Saving heatmap to 'thesis_final_grey.png'...")
+# plt.savefig('thesis_final_grey.png')
 
-# ---------------------------------------------------------
-# 8. SAVE DATA
-# ---------------------------------------------------------
-df.to_csv('feedback_with_psychographic_profiles.csv', index=False)
+# # ---------------------------------------------------------
+# # 8. SAVE DATA
+# # ---------------------------------------------------------
+# df.to_csv('feedback_with_psychographic_profiles.csv', index=False)
+
+# import matplotlib.pyplot as plt
+# from sklearn.cluster import KMeans
+# from sklearn.metrics import silhouette_score
+
+# # Range of clusters to test
+# K = range(2, 10)
+# inertia = []
+# silhouette_scores = []
+
+# # Assuming X_train_scaled is your prepared data
+# for k in K:
+#     km = KMeans(n_clusters=k, random_state=42)
+#     km.fit(X_train_scaled)
+#     inertia.append(km.inertia_)
+#     silhouette_scores.append(silhouette_score(X_train_scaled, km.labels_))
+
+# # Plotting the Elbow
+# plt.figure(figsize=(14, 5))
+
+# plt.subplot(1, 2, 1)
+# plt.plot(K, inertia, 'bx-')
+# plt.xlabel('k (Number of Clusters)')
+# plt.ylabel('Inertia (Sum of Squared Errors)')
+# plt.title('The Elbow Method')
+
+# # Plotting the Silhouette Scores
+# plt.subplot(1, 2, 2)
+# plt.plot(K, silhouette_scores, 'bx-')
+# plt.xlabel('k (Number of Clusters)')
+# plt.ylabel('Silhouette Score')
+# plt.title('The Silhouette Method (Higher is Better)')
+
+# print("Saving elbow plot to 'elbow_check.png'...")
+# plt.savefig('elbow_check.png')
