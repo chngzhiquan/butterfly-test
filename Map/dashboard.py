@@ -1,5 +1,8 @@
+import sys
 import streamlit as st
+st.write(f"Python Executable: {sys.executable}")
 import pandas as pd
+st.write(f"Pandas Version: {pd.__version__}")
 import pydeck as pdk
 import altair as alt
 import os
@@ -44,7 +47,29 @@ def load_data():
         
         # C. Query Data (Fetch all rows)
         query_result = layer.query(where="1=1", out_fields="*", return_geometry=True)
-        sdf = query_result.sdf  # Convert to Spatially Enabled DataFrame
+        features_list = query_result.features
+        data = []
+        
+        for f in features_list:
+            # 1. Get Attributes (Safe way)
+            row = f.attributes.copy()
+            
+            # 2. Get Geometry (Safe way)
+            # We access the 'geometry' property directly instead of checking "if 'geometry' in f"
+            # The geometry property returns a dictionary like {'x': ..., 'y': ...}
+            geom = f.geometry 
+            
+            if geom:
+                # ArcGIS uses different keys depending on the spatial reference
+                # Usually it's 'x'/'y' for points, but sometimes 'rings' or 'paths' for lines/polygons.
+                # We use .get() to avoid errors if 'y' is missing.
+                row['latitude'] = geom.get('y')
+                row['longitude'] = geom.get('x')
+            
+            data.append(row)
+    
+        # 3. Create DataFrame
+        sdf = pd.DataFrame(data)
         
         # --- DATA CLEANING ---
         
