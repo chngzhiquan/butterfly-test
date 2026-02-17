@@ -187,7 +187,7 @@ with c1:
             "HeatmapLayer",
             data=filtered_df,
             get_position='[longitude, latitude]',
-            get_weight="Count_", # Critical: Weights by number of birds seen
+            get_weight="Count_", # Critical: Weights by number of butterflies seen
             radiusPixels=40,
             intensity=1,
             threshold=0.05
