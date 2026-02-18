@@ -46,7 +46,7 @@ def load_data():
         layer = FeatureLayer(url)
         
         # C. Query Data (Fetch all rows)
-        query_result = layer.query(where="1=1", out_fields="*", return_geometry=True)
+        query_result = layer.query(where="1=1", out_fields="*", return_geometry=True, out_sr=4326)
         features_list = query_result.features
         data = []
         
@@ -63,8 +63,8 @@ def load_data():
                 # ArcGIS uses different keys depending on the spatial reference
                 # Usually it's 'x'/'y' for points, but sometimes 'rings' or 'paths' for lines/polygons.
                 # We use .get() to avoid errors if 'y' is missing.
-                row['latitude'] = geom.get('y')
-                row['longitude'] = geom.get('x')
+                row['Latitude'] = geom.get('y')
+                row['Longitude'] = geom.get('x')
             
             data.append(row)
     
@@ -75,8 +75,8 @@ def load_data():
         
         # 1. Extract Lat/Lon from ArcGIS 'SHAPE' object
         if 'SHAPE' in sdf.columns:
-            sdf['latitude'] = sdf['SHAPE'].apply(lambda x: x.y)
-            sdf['longitude'] = sdf['SHAPE'].apply(lambda x: x.x)
+            sdf['Latitude'] = sdf['SHAPE'].apply(lambda x: x.y)
+            sdf['Longitude'] = sdf['SHAPE'].apply(lambda x: x.x)
         
         # 2. Clean 'Count_' (Fill NaNs with 1 for single sightings)
         if 'Count_' in sdf.columns:
@@ -111,26 +111,62 @@ with st.spinner('🔄 Fetching live data from ArcGIS Cloud...'):
 # 3. SIDEBAR FILTERS
 st.sidebar.header("🔍 Filter Controls")
 
-# A. Year Filter
+# --- A. YEAR FILTER (Default = Select All) ---
 all_years = sorted(df['Year'].dropna().unique())
-selected_years = st.sidebar.multiselect("Select Year", all_years, default=all_years)
+# We set default=all_years so they are all checked on load
+selected_years = st.sidebar.multiselect(
+    "Select Year", 
+    all_years, 
+    default=all_years
+)
 
-# B. Month Filter
+# --- B. MONTH FILTER (Default = Select All) ---
 all_months = sorted(df['Month'].dropna().unique())
-selected_months = st.sidebar.multiselect("Select Month", all_months, default=all_months)
+selected_months = st.sidebar.multiselect(
+    "Select Month", 
+    all_months, 
+    default=all_months
+)
 
-# C. Species Filter
+# --- C. SPECIES FILTER (With Buttons) ---
+st.sidebar.markdown("---")
+st.sidebar.subheader("Species Filter")
+
+# Get list of species
 all_species = sorted(df['Species'].unique())
-selected_species = st.sidebar.multiselect("Select Species", all_species, default=all_species[:5])
 
-# D. Time of Day Filter
+# 1. Initialize Session State for this widget if it doesn't exist
+if 'species_list' not in st.session_state:
+    st.session_state.species_list = all_species[:5] # Start with top 5
+
+# 2. Define Callback Functions (The Button Logic)
+def select_all_species():
+    st.session_state.species_list = all_species
+
+def clear_all_species():
+    st.session_state.species_list = []
+
+# 3. Create the Buttons side-by-side
+col1, col2 = st.sidebar.columns(2)
+with col1:
+    st.button("Select All", on_click=select_all_species, use_container_width=True)
+with col2:
+    st.button("Clear", on_click=clear_all_species, use_container_width=True)
+
+# 4. The Multiselect Widget (Controlled by Session State)
+selected_species = st.sidebar.multiselect(
+    "Select Species", 
+    all_species, 
+    key='species_list' # This links the widget to the buttons
+)
+
+# --- D. TIME FILTER ---
 min_h, max_h = int(df['hour'].min()), int(df['hour'].max())
-if min_h == max_h: max_h += 1 # Prevent slider error if only 1 hour exists
+if min_h == max_h: max_h += 1
 time_range = st.sidebar.slider("Time of Day (24h)", min_h, max_h, (min_h, max_h))
 
-# E. Map Style ( moved to sidebar for cleanliness)
+# --- E. MAP SETTINGS ---
 st.sidebar.markdown("---")
-st.sidebar.subheader("🗺️ Map Settings")
 map_style = st.sidebar.radio("Layer Type", ["Scatter (Points)", "Heatmap (Density)"])
 
 # --- APPLY FILTERS ---
@@ -199,7 +235,7 @@ with c1:
         layer = pdk.Layer(
             "ScatterplotLayer",
             data=filtered_df,
-            get_position='[longitude, latitude]',
+            get_position='[Longitude, Latitude]',
             get_color='[200, 30, 0, 160]', # Reddish dots
             get_radius=30,
             pickable=True
@@ -211,7 +247,7 @@ with c1:
         layer = pdk.Layer(
             "HeatmapLayer",
             data=filtered_df,
-            get_position='[longitude, latitude]',
+            get_position='[Longitude, Latitude]',
             get_weight="Count_", # Critical: Weights by number of butterflies seen
             radiusPixels=40,
             intensity=1,
@@ -222,7 +258,7 @@ with c1:
 
     # Render Map
     st.pydeck_chart(pdk.Deck(
-        map_style="mapbox://styles/mapbox/light-v9",
+        map_style=None,
         initial_view_state=view_state,
         layers=layers,
         tooltip=tooltip
@@ -262,4 +298,4 @@ if not filtered_df.empty:
 
 # --- EXPANDER FOR RAW DATA ---
 with st.expander("📂 View Raw Data Table"):
-    st.dataframe(filtered_df[['Species', 'Count_', 'Park', 'Year', 'Month', 'Start_Time', 'latitude', 'longitude']])
+    st.dataframe(filtered_df[['Species', 'Count_', 'Park', 'Year', 'Month', 'Start_Time', 'Latitude', 'Longitude']])
