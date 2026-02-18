@@ -8,9 +8,6 @@ import altair as alt
 import os
 import json
 from datetime import time
-from dotenv import load_dotenv
-from arcgis.gis import GIS
-from arcgis.features import FeatureLayer
 
 # 1. APP CONFIGURATION
 st.set_page_config(
@@ -23,90 +20,32 @@ st.set_page_config(
 # 2. DATA LOADING & PROCESSING
 @st.cache_data(ttl=3600)
 def load_data():
-    """
-    Connects to ArcGIS Online, fetches the layer, and cleans the data.
-    """
-    # A. Load Credentials (Local .env or Cloud Secrets)
-    load_dotenv()
-    user = os.getenv("ARCGIS_USER") or st.secrets.get("ARCGIS_USER")
-    pwd = os.getenv("ARCGIS_PASS") or st.secrets.get("ARCGIS_PASS")
-    url = os.getenv("ARCGIS_LAYER_URL") or st.secrets.get("ARCGIS_LAYER_URL")
-
-    if not url:
-        st.error("❌ API URL missing. Please set ARCGIS_LAYER_URL in .env or secrets.")
-        st.stop()
-
-    try:
-        # B. Connect to ArcGIS (Login if credentials exist, else try anonymous)
-        if user and pwd:
-            gis = GIS("https://www.arcgis.com", user, pwd)
-        else:
-            gis = GIS() # Anonymous access if layer is public
-
-        layer = FeatureLayer(url)
+    df = pd.read_csv("biodiversity_data.csv")
         
-        # C. Query Data (Fetch all rows)
-        query_result = layer.query(where="1=1", out_fields="*", return_geometry=True, out_sr=4326)
-        features_list = query_result.features
-        data = []
-        
-        for f in features_list:
-            # 1. Get Attributes (Safe way)
-            row = f.attributes.copy()
-            
-            # 2. Get Geometry (Safe way)
-            # We access the 'geometry' property directly instead of checking "if 'geometry' in f"
-            # The geometry property returns a dictionary like {'x': ..., 'y': ...}
-            geom = f.geometry 
-            
-            if geom:
-                # ArcGIS uses different keys depending on the spatial reference
-                # Usually it's 'x'/'y' for points, but sometimes 'rings' or 'paths' for lines/polygons.
-                # We use .get() to avoid errors if 'y' is missing.
-                row['Latitude'] = geom.get('y')
-                row['Longitude'] = geom.get('x')
-            
-            data.append(row)
-    
-        # 3. Create DataFrame
-        sdf = pd.DataFrame(data)
-        
-        # --- DATA CLEANING ---
-        
-        # 1. Extract Lat/Lon from ArcGIS 'SHAPE' object
-        if 'SHAPE' in sdf.columns:
-            sdf['Latitude'] = sdf['SHAPE'].apply(lambda x: x.y)
-            sdf['Longitude'] = sdf['SHAPE'].apply(lambda x: x.x)
-        
-        # 2. Clean 'Count_' (Fill NaNs with 1 for single sightings)
-        if 'Count_' in sdf.columns:
-            sdf['Count_'] = sdf['Count_'].fillna(1).astype(int)
-        else:
-            sdf['Count_'] = 1 # Fallback if column is missing
+    # 2. Clean 'Count_' (Fill NaNs with 1 for single sightings)
+    if 'Count_' in df.columns:
+        df['Count_'] = df['Count_'].fillna(1).astype(int)
+    else:
+        df['Count_'] = 1 # Fallback if column is missing
 
-        # 3. Clean 'Start_Time' (Extract Hour for slider)
-        # Handles various ArcGIS time formats
-        if 'Start_Time' in sdf.columns:
-            # Try converting to datetime; errors='coerce' turns bad data into NaT
-            sdf['dt_temp'] = pd.to_datetime(sdf['Start_Time'], errors='coerce')
-            sdf['hour'] = sdf['dt_temp'].dt.hour.fillna(12).astype(int) # Default to noon if null
-        else:
-            sdf['hour'] = 12
+    # 3. Clean 'Start_Time' (Extract Hour for slider)
+    # Handles various ArcGIS time formats
+    if 'Start_Time' in df.columns:
+        # Try converting to datetime; errors='coerce' turns bad data into NaT
+        df['dt_temp'] = pd.to_datetime(df['Start_Time'], errors='coerce')
+        df['hour'] = df['dt_temp'].dt.hour.fillna(12).astype(int) # Default to noon if null
+    else:
+        df['hour'] = 12
 
-        # 4. Handle Missing Species/Parks
-        sdf['Species'] = sdf['Species'].fillna('Unknown')
-        sdf['Park'] = sdf['Park'].fillna('Unknown')
+    # 4. Handle Missing Species/Parks
+    df['Species'] = df['Species'].fillna('Unknown')
+    df['Park'] = df['Park'].fillna('Unknown')
 
-        return sdf
-
-    except Exception as e:
-        st.error(f"⚠️ Error connecting to ArcGIS: {e}")
-        st.stop()
+    return df
 
 # Load the data
 with st.spinner('🔄 Fetching live data from ArcGIS Cloud...'):
     df = load_data()
-
 
 # 3. SIDEBAR FILTERS
 st.sidebar.header("🔍 Filter Controls")
